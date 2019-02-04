@@ -114,11 +114,12 @@ type field struct {
 }
 
 type payloadData struct {
-	Timestamp uint32 `json:"timestamp"`
-	Order     uint32 `json:"order"`
-	Operation string `json:"operation"`
-	Database  string `json:"database"`
-	Object    string `json:"object"`
+	Timestamp   uint32 `json:"timestamp"`
+	Order       uint32 `json:"order"`
+	Operation   string `json:"operation"`
+	Database    string `json:"database"`
+	Object      string `json:"object"`
+	ResumeToken string `json:"resumeToken"`
 }
 
 func ConvertToOldFormat(doc bson.M) connectSchema {
@@ -133,6 +134,11 @@ func ConvertToOldFormat(doc bson.M) connectSchema {
 	if err != nil {
 		log.Fatal(err)
 	}
+	resumeToken := doc["_id"].(bson.M)["_data"].(string)
+	fmt.Println(resumeToken)
+	// The whole connectSchema will also be json encoded
+	// and so we need convert the bytes into a string
+	// otherwise the []bytes get encoded using base64
 	documentStr := string(documentBytes)
 	return connectSchema{
 		Schema: payloadSchema{
@@ -144,11 +150,13 @@ func ConvertToOldFormat(doc bson.M) connectSchema {
 				field{"int32", true, "order"},
 				field{"string", true, "operation"},
 				field{"string", true, "database"},
-				field{"string", true, "object"}}},
+				field{"string", true, "object"},
+				field{"string", true, "resumeToken"}}},
 		Payload: payloadData{
 			Timestamp: timestamp.T,
 			Order:     timestamp.I,
 			Operation: "i",
 			Database:  fmt.Sprintf("%s.%s", namespace["db"], namespace["coll"]),
-			Object:    documentStr}}
+			Object:    documentStr,
+			ResumeToken: resumeToken}}
 }
