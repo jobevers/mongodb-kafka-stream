@@ -14,12 +14,6 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-// TODO:
-// - limit changestream docs to inserts
-// - resume based on resumeToken
-// - resume base on timestamp
-// -
-
 // By limiting ourselves to these collections I can assume that a
 // topic already exists and has messages.  If that assumption changes,
 // we'll need to check if a topic exists, be able to create if it
@@ -172,6 +166,11 @@ func WatchCollection(collection *mongo.Collection, c chan string) {
 		fmt.Printf(".")
 		var item bson.M
 		cursor.Decode(&item)
+		operationType := item["operationType"].(string)
+		if operationType != "insert" {
+			log.Printf("Warning, document has operationType %s, expected insert", operationType)
+			continue
+		}
 		// Note that this needs to be synchronous. If this was
 		// asynchronous and something goes wrong it might be possible
 		// for event B to get into kafka and not event A and so event
