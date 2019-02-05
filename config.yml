@@ -1,0 +1,12 @@
+mongoUri: "mongodb://localhost:27017/?replicaSet=rs0"
+database: mirth
+collections:
+  - rf
+  - adt
+  - lab
+  - ecg
+  - vf
+  - labMuse
+  - nf
+kafkaBroker: localhost:9092
+zookeeper: localhost:2181
