@@ -37,3 +37,10 @@ jupyter notebook "Stress Test.ipynb"
 
 It also has some basic stats to look at timestamps
 and make sure that no messages are lost.
+
+
+# TODO for testing
+ - create topics
+ - put in existing messages
+   - with the old way of using a timestamp
+   - with the new way of using a resumeToken
