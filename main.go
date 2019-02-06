@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -218,7 +219,11 @@ func getLastMessage(broker string, topic string) (map[string]interface{}, error)
 	// TODO: this is so much work just to get one message. Maybe there is a better way?
 	logger.Debugf("Getting last message for %s", topic)
 	conn, err := kafka.DialLeader(context.Background(), "tcp", broker, topic, 0)
-	_, last, err := conn.ReadOffsets()
+	first, last, err := conn.ReadOffsets()
+	logger.Debugf("For %s: first: %d, last: %d", topic, first, last)
+	if last == 0 {
+		return nil, errors.New(fmt.Sprintf("Topic %s doesn't have any messages", topic))
+	}
 	// Would be nice if I could re-use the connection from above
 	// but that is not part of the library
 	r := kafka.NewReader(kafka.ReaderConfig{
