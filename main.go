@@ -27,6 +27,7 @@ type Config struct {
 	// create if it doesn't and then start the mongo changestream
 	// watcher from the start of that collection.
 	Collections []string `yaml:"collections"`
+	LogLevel    string   `yaml:"logLevel"`
 }
 
 var logger = loggo.GetLogger("main")
@@ -44,6 +45,12 @@ func main() {
 	if err != nil {
 		logger.Errorf(err.Error())
 		os.Exit(1)
+	}
+	level, ok := loggo.ParseLevel(config.LogLevel)
+	if ok {
+		logger.SetLogLevel(level)
+	} else {
+		logger.Warningf("Log level %s is unknown, using INFO", config.LogLevel)
 	}
 	db, err := openDatabase(config)
 	if err != nil {
@@ -179,6 +186,7 @@ func WatchCollection(broker string, collection *mongo.Collection, c chan string)
 
 	logger.Debugf("Waiting for documents on: %s", collection.Name())
 	for cursor.Next(context.Background()) {
+		logger.Debugf("New document recieved for %s", collection.Name())
 		var item bson.M
 		cursor.Decode(&item)
 		operationType := item["operationType"].(string)
@@ -190,18 +198,25 @@ func WatchCollection(broker string, collection *mongo.Collection, c chan string)
 		// asynchronous and something goes wrong it might be possible
 		// for event B to get into kafka and not event A and so event
 		// A would be lost forever
-		err = SendToKafka(w, item)
+		msg, err := getMessage(item)
 		if err != nil {
 			logger.Errorf(err.Error())
 			return
 		}
+		err = w.WriteMessages(context.Background(), *msg)
+		if err != nil {
+			logger.Errorf(err.Error())
+			return
+		}
+		logger.Debugf("Sent message %s to %s", string(msg.Value), topic)
 	}
 }
 
 // Returns the last message on kafka for the given topic in partition 0.
 // This probably only works correctly if there is only one partition
 func getLastMessage(broker string, topic string) (map[string]interface{}, error) {
-	logger.Debugf(topic)
+	// TODO: this is so much work just to get one message. Maybe there is a better way?
+	logger.Debugf("Getting last message for %s", topic)
 	conn, err := kafka.DialLeader(context.Background(), "tcp", broker, topic, 0)
 	_, last, err := conn.ReadOffsets()
 	// Would be nice if I could re-use the connection from above
@@ -226,18 +241,17 @@ func getLastMessage(broker string, topic string) (map[string]interface{}, error)
 
 // Converts and serializes the input document and then
 // sends it along to kafka.
-func SendToKafka(w *kafka.Writer, doc bson.M) error {
+func getMessage(doc bson.M) (*kafka.Message, error) {
 	msgValue, err := ConvertToOldFormat(doc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	output, err := json.Marshal(msgValue)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	msg := kafka.Message{Value: output}
-	w.WriteMessages(context.Background(), msg)
-	return nil
+	return &msg, nil
 }
 
 type connectSchema struct {

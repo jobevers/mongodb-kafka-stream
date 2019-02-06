@@ -10,3 +10,4 @@ collections:
   - nf
 kafkaBroker: localhost:9092
 zookeeper: localhost:2181
+logLevel: DEBUG
